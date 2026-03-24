@@ -1,6 +1,6 @@
 const express = require('express');
 const axios = require('axios');
-const ytdl = require('@distube/ytdl-core');
+const { exec } = require('child_process');
 const fs = require('fs');
 
 const app = express();
@@ -23,27 +23,29 @@ async function sendText(chatId, text) {
 
 async function downloadAndSend(chatId, url) {
   await sendText(chatId, '⏳ Downloading your video...');
-  try {
-    const filename = `/tmp/video_${Date.now()}.mp4`;
-    const stream = ytdl(url, { quality: 'highest' });
-    const writer = fs.createWriteStream(filename);
-    await new Promise((resolve, reject) => {
-      stream.pipe(writer);
-      writer.on('finish', resolve);
-      writer.on('error', reject);
-      stream.on('error', reject);
-    });
-    const videoData = fs.readFileSync(filename).toString('base64');
-    await axios.post('https://gate.whapi.cloud/messages/video', {
-      to: chatId,
-      media: `data:video/mp4;base64,${videoData}`,
-      caption: '🎬 Here is your video!'
-    }, { headers: { Authorization: `Bearer ${TOKEN}` } });
-    fs.unlinkSync(filename);
-  } catch (err) {
-    console.log('Download error:', err.message);
-    await sendText(chatId, '❌ Failed to download. Make sure the link is public!');
-  }
+  const filename = `/tmp/video_${Date.now()}.mp4`;
+
+  exec(`yt-dlp -o "${filename}" --merge-output-format mp4 "${url}"`, async (err, stdout, stderr) => {
+    console.log('stdout:', stdout);
+    console.log('stderr:', stderr);
+    if (err) {
+      console.log('Error:', err.message);
+      await sendText(chatId, '❌ Failed: ' + stderr.slice(0, 200));
+      return;
+    }
+    try {
+      const videoData = fs.readFileSync(filename).toString('base64');
+      await axios.post('https://gate.whapi.cloud/messages/video', {
+        to: chatId,
+        media: `data:video/mp4;base64,${videoData}`,
+        caption: '🎬 Here is your video!'
+      }, { headers: { Authorization: `Bearer ${TOKEN}` } });
+      fs.unlinkSync(filename);
+    } catch (e) {
+      console.log('Send error:', e.message);
+      await sendText(chatId, '❌ Failed to send video: ' + e.message);
+    }
+  });
 }
 
 app.get('/', (req, res) => res.send('Bot is running!'));
