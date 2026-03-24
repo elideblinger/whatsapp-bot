@@ -1,12 +1,13 @@
 const express = require('express');
 const axios = require('axios');
-const { exec } = require('child_process');
+const { execSync, exec } = require('child_process');
 const fs = require('fs');
 
 const app = express();
 app.use(express.json());
 
 const TOKEN = 'jkuxxsoxDUwNZxXo20T3gK6zuJcwS0o8';
+const YTDLP = '/opt/render/project/src/bin/yt-dlp';
 
 function isVideoLink(text) {
   return /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|twitter\.com|x\.com/.test(text);
@@ -16,21 +17,29 @@ async function sendText(chatId, text) {
   await axios.post('https://gate.whapi.cloud/messages/text', {
     to: chatId,
     body: text
-  }, {
-    headers: { Authorization: `Bearer ${TOKEN}` }
-  });
+  }, { headers: { Authorization: `Bearer ${TOKEN}` } });
 }
 
 async function downloadAndSend(chatId, url) {
   await sendText(chatId, '⏳ Downloading your video...');
   const filename = `/tmp/video_${Date.now()}.mp4`;
 
-  exec(`yt-dlp -o "${filename}" --merge-output-format mp4 "${url}"`, async (err, stdout, stderr) => {
+  // Check yt-dlp exists
+  try {
+    const version = execSync(`${YTDLP} --version`).toString().trim();
+    console.log('yt-dlp version:', version);
+  } catch(e) {
+    console.log('yt-dlp not found:', e.message);
+    await sendText(chatId, '❌ yt-dlp not found: ' + e.message);
+    return;
+  }
+
+  exec(`${YTDLP} -o "${filename}" --merge-output-format mp4 "${url}"`, async (err, stdout, stderr) => {
     console.log('stdout:', stdout);
     console.log('stderr:', stderr);
     if (err) {
       console.log('Error:', err.message);
-      await sendText(chatId, '❌ Failed: ' + stderr.slice(0, 200));
+      await sendText(chatId, '❌ Error: ' + (stderr || err.message).slice(0, 300));
       return;
     }
     try {
@@ -43,7 +52,7 @@ async function downloadAndSend(chatId, url) {
       fs.unlinkSync(filename);
     } catch (e) {
       console.log('Send error:', e.message);
-      await sendText(chatId, '❌ Failed to send video: ' + e.message);
+      await sendText(chatId, '❌ Send error: ' + e.message.slice(0, 200));
     }
   });
 }
