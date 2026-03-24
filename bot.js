@@ -23,37 +23,22 @@ async function sendText(chatId, text) {
 
 async function downloadAndSend(chatId, url) {
   await sendText(chatId, '⏳ Downloading your video...');
-
   try {
-    const agent = ytdl.createProxyAgent({ uri: 'https://www.youtube.com' });
     const filename = `/tmp/video_${Date.now()}.mp4`;
-    const stream = ytdl(url, { 
-      quality: 'highestvideo',
-      agent,
-      requestOptions: {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        }
-      }
-    });
+    const stream = ytdl(url, { quality: 'highest' });
     const writer = fs.createWriteStream(filename);
-
     await new Promise((resolve, reject) => {
       stream.pipe(writer);
       writer.on('finish', resolve);
       writer.on('error', reject);
       stream.on('error', reject);
     });
-
     const videoData = fs.readFileSync(filename).toString('base64');
     await axios.post('https://gate.whapi.cloud/messages/video', {
       to: chatId,
       media: `data:video/mp4;base64,${videoData}`,
       caption: '🎬 Here is your video!'
-    }, {
-      headers: { Authorization: `Bearer ${TOKEN}` }
-    });
-
+    }, { headers: { Authorization: `Bearer ${TOKEN}` } });
     fs.unlinkSync(filename);
   } catch (err) {
     console.log('Download error:', err.message);
@@ -61,22 +46,25 @@ async function downloadAndSend(chatId, url) {
   }
 }
 
+app.get('/', (req, res) => res.send('Bot is running!'));
+
 app.use(async (req, res) => {
-  const msg = req.body.messages?.[0];
-  if (!msg || msg.from_me) return res.sendStatus(200);
-
-  const chatId = msg.chat_id;
-  const text = msg.text?.body || '';
-
-  console.log('Received:', text);
-
-  if (isVideoLink(text)) {
-    downloadAndSend(chatId, text);
-  } else {
-    await sendText(chatId, 'Send me a YouTube, TikTok or Instagram link and I\'ll download it for you! 🎬');
+  try {
+    const msg = req.body?.messages?.[0];
+    if (!msg || msg.from_me) return res.sendStatus(200);
+    const chatId = msg.chat_id;
+    const text = msg.text?.body || '';
+    console.log('Received:', text);
+    if (isVideoLink(text)) {
+      downloadAndSend(chatId, text);
+    } else {
+      await sendText(chatId, 'Send me a YouTube, TikTok or Instagram link! 🎬');
+    }
+    res.sendStatus(200);
+  } catch (err) {
+    console.log('Error:', err.message);
+    res.sendStatus(200);
   }
-
-  res.sendStatus(200);
 });
 
 const PORT = process.env.PORT || 3000;
