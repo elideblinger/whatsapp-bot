@@ -9,7 +9,7 @@ app.use(express.json());
 const TOKEN = 'jkuxxsoxDUwNZxXo20T3gK6zuJcwS0o8';
 const YTDLP = '/opt/render/project/src/bin/yt-dlp';
 const COOKIES = '/opt/render/project/src/cookies.txt';
-const DENO = '/opt/render/.deno/bin/deno';
+const DENO = '/opt/render/project/src/deno/bin/deno';
 
 function isVideoLink(text) {
   return /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|twitter\.com|x\.com/.test(text);
