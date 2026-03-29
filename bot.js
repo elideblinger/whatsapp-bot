@@ -9,6 +9,7 @@ app.use(express.json());
 const TOKEN = 'jkuxxsoxDUwNZxXo20T3gK6zuJcwS0o8';
 const YTDLP = '/opt/render/project/src/bin/yt-dlp';
 const COOKIES = '/opt/render/project/src/cookies.txt';
+const DENO = '/opt/render/.deno/bin/deno';
 
 function isVideoLink(text) {
   return /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|twitter\.com|x\.com/.test(text);
@@ -25,8 +26,9 @@ async function downloadAndSend(chatId, url) {
   await sendText(chatId, '⏳ Downloading your video...');
   const filename = `/tmp/video_${Date.now()}.mp4`;
   const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
+  const denoFlag = fs.existsSync(DENO) ? `--js-runtimes deno:${DENO}` : '';
 
-  exec(`${YTDLP} ${cookieFlag} -o "${filename}" --merge-output-format mp4 "${url}"`, async (err, stdout, stderr) => {
+  exec(`${YTDLP} ${cookieFlag} ${denoFlag} -o "${filename}" --merge-output-format mp4 "${url}"`, async (err, stdout, stderr) => {
     console.log('stdout:', stdout);
     console.log('stderr:', stderr);
     if (err) {
