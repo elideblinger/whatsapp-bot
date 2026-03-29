@@ -8,6 +8,7 @@ app.use(express.json());
 
 const TOKEN = 'jkuxxsoxDUwNZxXo20T3gK6zuJcwS0o8';
 const YTDLP = '/opt/render/project/src/bin/yt-dlp';
+const COOKIES = '/opt/render/project/src/cookies.txt';
 
 function isVideoLink(text) {
   return /youtube\.com|youtu\.be|tiktok\.com|instagram\.com|twitter\.com|x\.com/.test(text);
@@ -23,22 +24,12 @@ async function sendText(chatId, text) {
 async function downloadAndSend(chatId, url) {
   await sendText(chatId, '⏳ Downloading your video...');
   const filename = `/tmp/video_${Date.now()}.mp4`;
+  const cookieFlag = fs.existsSync(COOKIES) ? `--cookies "${COOKIES}"` : '';
 
-  // Check yt-dlp exists
-  try {
-    const version = execSync(`${YTDLP} --version`).toString().trim();
-    console.log('yt-dlp version:', version);
-  } catch(e) {
-    console.log('yt-dlp not found:', e.message);
-    await sendText(chatId, '❌ yt-dlp not found: ' + e.message);
-    return;
-  }
-
-  exec(`${YTDLP} -o "${filename}" --merge-output-format mp4 "${url}"`, async (err, stdout, stderr) => {
+  exec(`${YTDLP} ${cookieFlag} -o "${filename}" --merge-output-format mp4 "${url}"`, async (err, stdout, stderr) => {
     console.log('stdout:', stdout);
     console.log('stderr:', stderr);
     if (err) {
-      console.log('Error:', err.message);
       await sendText(chatId, '❌ Error: ' + (stderr || err.message).slice(0, 300));
       return;
     }
@@ -51,7 +42,6 @@ async function downloadAndSend(chatId, url) {
       }, { headers: { Authorization: `Bearer ${TOKEN}` } });
       fs.unlinkSync(filename);
     } catch (e) {
-      console.log('Send error:', e.message);
       await sendText(chatId, '❌ Send error: ' + e.message.slice(0, 200));
     }
   });
